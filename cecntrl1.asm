@@ -82,7 +82,7 @@ SETUP_FORWARD:
     GOTO    DISPLAY_LOOP
 
 SETUP_REVERSE:
-    MOVLW   d'104'       ; 20 chars * 5 cols = 100. Max index is 99.
+    MOVLW   d'99'       ; 20 chars * 5 cols = 100. Max index is 99.
     MOVWF   COL_INDEX
 
 ; ========================================================
@@ -108,7 +108,7 @@ DISPLAY_LOOP:
 
 INC_INDEX:
     INCF    COL_INDEX, F
-    MOVLW   d'105'      ; Did we reach end of table?
+    MOVLW   d'100'      ; Did we reach end of table?
     SUBWF   COL_INDEX, W
     BTFSC   STATUS, Z
     GOTO    END_SWIPE   ; <--- CHANGED: Go to Debounce instead of WAIT_SWIPE
@@ -323,14 +323,7 @@ MESSAGE_TABLE:
     RETLW   b'01001001'
     RETLW   b'01001001'
     RETLW   b'00110010'
-
-    ; Character 21: 'E'
-    RETLW   b'01111111'
-    RETLW   b'01001001'
-    RETLW   b'01001001'
-    RETLW   b'01001001'
-    RETLW   b'01000001'
-    
+  
     ; End Padding
     RETLW   b'00000000' 
     RETURN
