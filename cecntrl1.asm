@@ -108,18 +108,45 @@ DISPLAY_LOOP:
 
 INC_INDEX:
     INCF    COL_INDEX, F
-    MOVLW   d'105'      ; Did we reach 100?
+    MOVLW   d'105'      ; Did we reach end of table?
     SUBWF   COL_INDEX, W
     BTFSC   STATUS, Z
-    GOTO    WAIT_SWIPE  ; Message done, wait for next swipe
+    GOTO    END_SWIPE   ; <--- CHANGED: Go to Debounce instead of WAIT_SWIPE
     GOTO    DISPLAY_LOOP
 
 DEC_INDEX:
     MOVF    COL_INDEX, W ; Check if index is already 0
     BTFSC   STATUS, Z
-    GOTO    WAIT_SWIPE   ; Message done
+    GOTO    END_SWIPE    ; <--- CHANGED: Go to Debounce instead of WAIT_SWIPE
     DECF    COL_INDEX, F
     GOTO    DISPLAY_LOOP
+
+; ========================================================
+; DEBOUNCE / LOCKOUT ROUTINE
+; ========================================================
+END_SWIPE:
+    ; Stage 1: Blind lockout delay (~100ms at 4MHz)
+    ; This ignores all bounce logic completely.
+    MOVLW   d'130'
+    MOVWF   DELAY_CNT1
+LOCKOUT_OUTER:
+    CLRF    DELAY_CNT2      ; 256 loops
+LOCKOUT_INNER:
+    NOP
+    DECFSZ  DELAY_CNT2, F
+    GOTO    LOCKOUT_INNER
+    DECFSZ  DELAY_CNT1, F
+    GOTO    LOCKOUT_OUTER
+
+    ; Stage 2: Wait until both sensors are definitively LOW
+WAIT_RELEASE:
+    BTFSC   PORTA, 0
+    GOTO    WAIT_RELEASE    ; RA0 is still bouncing/high, keep waiting
+    BTFSC   PORTA, 1
+    GOTO    WAIT_RELEASE    ; RA1 is still bouncing/high, keep waiting
+
+    ; It is now safe to look for a completely new swipe
+    GOTO    WAIT_SWIPE
 
 ; ========================================================
 ; VARIABLE DELAY ROUTINE (SCALED BY SPEED)
