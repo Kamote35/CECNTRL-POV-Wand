@@ -1,5 +1,5 @@
 ; Device: PIC16F628A
-; Function: POV Display - 20 Character Message ("MICROCONTROLLERSROCK")
+; Function: POV Display - 20 Character Message ("YOU PASSED THE COURS")
 ; Inputs: Pin 17 (RA0) Left Piezo, Pin 18 (RA1) Right Piezo
 ; Outputs: PORTB (Pins 6-13) - 8 LEDs
 
@@ -19,6 +19,7 @@
 
     ORG     0x000
 
+; Macros
 INIT:
     MOVLW   0x07        ; Turn off analog comparators
     MOVWF   CMCON
@@ -35,7 +36,7 @@ INIT:
     CLRF    PORTB
 
 ; ========================================================
-; SENSOR POLLING (WAIT FOR SWIPE)
+; SENSOR POLLING 
 ; ========================================================
 WAIT_SWIPE:
     CLRF    PORTB       ; Ensure LEDs are off while waiting
@@ -63,7 +64,7 @@ WAIT_L:
     GOTO    WAIT_L
 
 ; ========================================================
-; DISPLAY PREPARATION
+; DISPLAY PREP
 ; ========================================================
 START_DISPLAY:
     ; Save the speed. (If Timer0 is 0, default it to 1 to prevent infinite loop)
@@ -82,7 +83,7 @@ SETUP_FORWARD:
     GOTO    DISPLAY_LOOP
 
 SETUP_REVERSE:
-    MOVLW   d'104'       ; 20 chars * 5 cols = 100. Max index is 99.
+    MOVLW   d'99'       ; 20 chars * 5 cols = 100. Max index is 99.
     MOVWF   COL_INDEX
 
 ; ========================================================
@@ -108,7 +109,7 @@ DISPLAY_LOOP:
 
 INC_INDEX:
     INCF    COL_INDEX, F
-    MOVLW   d'105'      ; Did we reach 100?
+    MOVLW   d'100'      ; Did we reach 100?
     SUBWF   COL_INDEX, W
     BTFSC   STATUS, Z
     GOTO    WAIT_SWIPE  ; Message done, wait for next swipe
@@ -150,7 +151,7 @@ TINY_LOOP:
 
 ; ========================================================
 ; 5x8 CHARACTER LOOKUP TABLE (105 BYTES)
-; Message: "YOU PASSED THE COURSE"
+; Message: "YOU PASSED THE COURS"
 ; ========================================================
 MESSAGE_TABLE:
     ; NOTE: Must be placed in the first 256 bytes of memory (Page 0) 
@@ -297,13 +298,6 @@ MESSAGE_TABLE:
     RETLW   b'01001001'
     RETLW   b'00110010'
 
-    ; Character 21: 'E'
-    RETLW   b'01111111'
-    RETLW   b'01001001'
-    RETLW   b'01001001'
-    RETLW   b'01001001'
-    RETLW   b'01000001'
-    
     ; End Padding
     RETLW   b'00000000' 
     RETURN
