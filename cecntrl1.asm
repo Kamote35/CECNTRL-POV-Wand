@@ -1,5 +1,5 @@
 ; Device: PIC16F628A
-; Function: POV Display - 20 Character Message ("MICROCONTROLLERSROCK")
+; Function: POV Display
 ; Inputs: Pin 17 (RA0) Left Piezo, Pin 18 (RA1) Right Piezo
 ; Outputs: PORTB (Pins 6-13) - 8 LEDs
 
@@ -12,7 +12,7 @@
     CBLOCK 0x20
         SPEED_VAL     ; Timer0 value used to scale display delay
         DIRECTION     ; 0 = Forward, 1 = Reverse
-        COL_INDEX     ; Current column being displayed (0 to 99)
+        COL_INDEX     ; Current column being displayed
         DELAY_CNT1    ; Outer delay loop counter (Speed scaled)
         DELAY_CNT2    ; Inner delay loop counter
     ENDC
@@ -82,7 +82,7 @@ SETUP_FORWARD:
     GOTO    DISPLAY_LOOP
 
 SETUP_REVERSE:
-    MOVLW   d'104'       ; 20 chars * 5 cols = 100. Max index is 99.
+    MOVLW   d'24'       ; 5 chars * 5 cols = 25. Max index is 24.
     MOVWF   COL_INDEX
 
 ; ========================================================
@@ -108,28 +108,53 @@ DISPLAY_LOOP:
 
 INC_INDEX:
     INCF    COL_INDEX, F
-    MOVLW   d'105'      ; Did we reach 100?
+    MOVLW   d'25'       ; Did we reach end of table? (25 bytes total)
     SUBWF   COL_INDEX, W
     BTFSC   STATUS, Z
-    GOTO    WAIT_SWIPE  ; Message done, wait for next swipe
+    GOTO    END_SWIPE   
     GOTO    DISPLAY_LOOP
 
 DEC_INDEX:
     MOVF    COL_INDEX, W ; Check if index is already 0
     BTFSC   STATUS, Z
-    GOTO    WAIT_SWIPE   ; Message done
+    GOTO    END_SWIPE    
     DECF    COL_INDEX, F
     GOTO    DISPLAY_LOOP
+
+; ========================================================
+; DEBOUNCE / LOCKOUT ROUTINE
+; ========================================================
+END_SWIPE:
+    ; Stage 1: Blind lockout delay (~100ms at 4MHz)
+    MOVLW   d'130'
+    MOVWF   DELAY_CNT1
+LOCKOUT_OUTER:
+    CLRF    DELAY_CNT2      ; 256 loops
+LOCKOUT_INNER:
+    NOP
+    DECFSZ  DELAY_CNT2, F
+    GOTO    LOCKOUT_INNER
+    DECFSZ  DELAY_CNT1, F
+    GOTO    LOCKOUT_OUTER
+
+    ; Stage 2: Wait until both sensors are definitively LOW
+WAIT_RELEASE:
+    BTFSC   PORTA, 0
+    GOTO    WAIT_RELEASE    ; RA0 is still bouncing/high, keep waiting
+    BTFSC   PORTA, 1
+    GOTO    WAIT_RELEASE    ; RA1 is still bouncing/high, keep waiting
+
+    ; It is now safe to look for a completely new swipe
+    GOTO    WAIT_SWIPE
 
 ; ========================================================
 ; VARIABLE DELAY ROUTINE (SCALED BY SPEED)
 ; ========================================================
 VAR_DELAY:
-    ; This delay dynamically scales based on the timer value captured
     MOVF    SPEED_VAL, W
     MOVWF   DELAY_CNT1
 OUTER_LOOP:
-    MOVLW   d'20'       ; Adjust this constant to tune the baseline width of letters
+    MOVLW   d'2'        ; <--- FIXED! A value of 2-5 is usually good for POV width
     MOVWF   DELAY_CNT2
 INNER_LOOP:
     NOP
@@ -140,21 +165,18 @@ INNER_LOOP:
     RETURN
 
 TINY_DELAY:
-    ; A very short static delay to separate individual columns slightly
-    MOVLW   d'15'
+    MOVLW   d'10'       ; <--- FIXED! Short static gap between LED columns
     MOVWF   DELAY_CNT2
 TINY_LOOP:
     DECFSZ  DELAY_CNT2, F
-    GOTO    TINY_LOOP
+    GOTO    TINY_LOOP   ; <--- FIXED: Uncommented!
     RETURN
 
 ; ========================================================
-; 5x8 CHARACTER LOOKUP TABLE (105 BYTES)
-; Message: "YOU PASSED THE COURSE"
+; 5x8 CHARACTER LOOKUP TABLE (25 BYTES)
+; Message: "YOU  "
 ; ========================================================
 MESSAGE_TABLE:
-    ; NOTE: Must be placed in the first 256 bytes of memory (Page 0) 
-    ; or PCLATH must be managed.
     ADDWF   PCL, F
 
     ; Character 1: 'Y'
@@ -185,127 +207,9 @@ MESSAGE_TABLE:
     RETLW   b'00000000'
     RETLW   b'00000000'
 
-    ; Character 5: 'P'
-    RETLW   b'01111111'
-    RETLW   b'00001001'
-    RETLW   b'00001001'
-    RETLW   b'00001001'
-    RETLW   b'00000110'
-
-    ; Character 6: 'A'
-    RETLW   b'01111110'
-    RETLW   b'00001001'
-    RETLW   b'00001001'
-    RETLW   b'00001001'
-    RETLW   b'01111110'
-
-    ; Character 7: 'S'
-    RETLW   b'00100110'
-    RETLW   b'01001001'
-    RETLW   b'01001001'
-    RETLW   b'01001001'
-    RETLW   b'00110010'
-
-    ; Character 8: 'S'
-    RETLW   b'00100110'
-    RETLW   b'01001001'
-    RETLW   b'01001001'
-    RETLW   b'01001001'
-    RETLW   b'00110010'
-
-    ; Character 9: 'E'
-    RETLW   b'01111111'
-    RETLW   b'01001001'
-    RETLW   b'01001001'
-    RETLW   b'01001001'
-    RETLW   b'01000001'
-
-    ; Character 10: 'D'
-    RETLW   b'01111111'
-    RETLW   b'01000001'
-    RETLW   b'01000001'
-    RETLW   b'01000001'
-    RETLW   b'00111110'
-
-    ; Character 11: ' ' (Space)
-    RETLW   b'00000000'
-    RETLW   b'00000000'
-    RETLW   b'00000000'
-    RETLW   b'00000000'
-    RETLW   b'00000000'
-
-    ; Character 12: 'T'
-    RETLW   b'00000001'
-    RETLW   b'00000001'
-    RETLW   b'01111111'
-    RETLW   b'00000001'
-    RETLW   b'00000001'
-
-    ; Character 13: 'H'
-    RETLW   b'01111111'
-    RETLW   b'00001000'
-    RETLW   b'00001000'
-    RETLW   b'00001000'
-    RETLW   b'01111111'
-
-    ; Character 14: 'E'
-    RETLW   b'01111111'
-    RETLW   b'01001001'
-    RETLW   b'01001001'
-    RETLW   b'01001001'
-    RETLW   b'01000001'
-
-    ; Character 15: ' ' (Space)
-    RETLW   b'00000000'
-    RETLW   b'00000000'
-    RETLW   b'00000000'
-    RETLW   b'00000000'
-    RETLW   b'00000000'
-
-    ; Character 16: 'C'
-    RETLW   b'00111110'
-    RETLW   b'01000001'
-    RETLW   b'01000001'
-    RETLW   b'01000001'
-    RETLW   b'00100010'
-
-    ; Character 17: 'O'
-    RETLW   b'00111110'
-    RETLW   b'01000001'
-    RETLW   b'01000001'
-    RETLW   b'01000001'
-    RETLW   b'00111110'
-
-    ; Character 18: 'U'
-    RETLW   b'00111111'
-    RETLW   b'01000000'
-    RETLW   b'01000000'
-    RETLW   b'01000000'
-    RETLW   b'00111111'
-
-    ; Character 19: 'R'
-    RETLW   b'01111111'
-    RETLW   b'00001001'
-    RETLW   b'00011001'
-    RETLW   b'00101001'
-    RETLW   b'01100110'
-
-    ; Character 20: 'S'
-    RETLW   b'00100110'
-    RETLW   b'01001001'
-    RETLW   b'01001001'
-    RETLW   b'01001001'
-    RETLW   b'00110010'
-
-    ; Character 21: 'E'
-    RETLW   b'01111111'
-    RETLW   b'01001001'
-    RETLW   b'01001001'
-    RETLW   b'01001001'
-    RETLW   b'01000001'
-    
     ; End Padding
     RETLW   b'00000000' 
-    RETURN
-
-    END
+    RETLW   b'00000000' 
+    RETLW   b'00000000' 
+    RETLW   b'00000000' 
+    RETLW   b'00000000'
